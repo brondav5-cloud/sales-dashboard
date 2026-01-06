@@ -12,8 +12,8 @@ st.set_page_config(page_title="דשבורד מכירות", page_icon="📊", lay
 # נתוני סוכנים
 # ========================================
 AGENTS_DATA = {
-    "יוסף": {"password": "Yos148t", "stores": [67, 834, 291, 262, 685, 702, 638, 664, 1299, 1300, 1303, 1316, 1317, 1318, 1319, 1320, 1321, 1325, 1326, 1330, 1331, 1332, 1333, 1334, 1335, 1337, 1340, 1341]},
-    "ניקול": {"password": "Niko18", "stores": [665, 441, 1094, 340, 1106, 1122, 1093, 62, 599, 263, 1084, 309, 624, 1227]},
+    "יוסף": {"password": "Agen148", "stores": [67, 834, 291, 262, 685, 702, 638, 664, 1299, 1300, 1303, 1316, 1317, 1318, 1319, 1320, 1321, 1325, 1326, 1330, 1331, 1332, 1333, 1334, 1335, 1337, 1340, 1341]},
+    "ניקול": {"password": "Agen148", "stores": [665, 441, 1094, 340, 1106, 1122, 1093, 62, 599, 263, 1084, 309, 624, 1227]},
 }
 ADMIN_PASSWORD = "admin2025"
 
@@ -137,7 +137,7 @@ with col2:
 
 # הצגת פרטי משתמש
 if st.session_state.user_type == "agent":
-    st.markdown(f'<div class="agent-header">👤 שלום <b>{st.session_state.user_name}</b> | החנויות שלך: <b>{len(st.session_state.user_stores)}</b></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="agent-header">👤 שלום <b>{st.session_state.user_name}</b> | החנויות שלך: <b>{len(st.session_state.user_stores)}</b> | מזהים: {st.session_state.user_stores[:5]}...</div>', unsafe_allow_html=True)
 else:
     st.markdown(f'<div class="agent-header">👑 מצב מנהל - גישה לכל הנתונים</div>', unsafe_allow_html=True)
 
