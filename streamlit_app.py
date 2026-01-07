@@ -615,7 +615,18 @@ with tabs[3]:
             d['שינוי'] = d['שינוי'].apply(fmt_pct)
             d[PERIOD_LABELS['2v2_prev']] = d[PERIOD_LABELS['2v2_prev']].apply(fmt_num)
             d[PERIOD_LABELS['2v2_last']] = d[PERIOD_LABELS['2v2_last']].apply(fmt_num)
-            st.dataframe(d, hide_index=True, use_container_width=True, height=400)
+            
+            # Column config for better display
+            col_config = {
+                'מוצר': st.column_config.TextColumn('מוצר', width='large'),
+                'סיווג': st.column_config.TextColumn('סיווג', width='medium'),
+                PERIOD_LABELS['year1']: st.column_config.TextColumn(PERIOD_LABELS['year1'], width='small'),
+                PERIOD_LABELS['year2']: st.column_config.TextColumn(PERIOD_LABELS['year2'], width='small'),
+                'שינוי': st.column_config.TextColumn('שינוי', width='small'),
+                PERIOD_LABELS['2v2_prev']: st.column_config.TextColumn(PERIOD_LABELS['2v2_prev'], width='small'),
+                PERIOD_LABELS['2v2_last']: st.column_config.TextColumn(PERIOD_LABELS['2v2_last'], width='small'),
+            }
+            st.dataframe(d, hide_index=True, use_container_width=True, height=400, column_config=col_config)
             
             st.subheader("📊 Top 15 מוצרים")
             top15 = sp2.nlargest(15, 'year2')
@@ -862,3 +873,22 @@ with tabs[9]:
         "דוח_מלא_טאוברד.xlsx",
         use_container_width=True
     )
+
+# FIX: Add custom CSS for better table display at the end
+st.markdown("""
+<style>
+/* Fix table columns width */
+[data-testid="stDataFrame"] {
+    width: 100%;
+}
+[data-testid="stDataFrame"] table {
+    width: 100% !important;
+}
+[data-testid="stDataFrame"] th, 
+[data-testid="stDataFrame"] td {
+    min-width: 80px !important;
+    white-space: nowrap !important;
+    text-align: right !important;
+}
+</style>
+""", unsafe_allow_html=True)
