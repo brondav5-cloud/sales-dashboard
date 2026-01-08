@@ -131,7 +131,7 @@ def reverse_hebrew(text):
     return str(text)[::-1]
 
 def create_store_pdf(store_info, store_products, missing_products):
-    """יצירת PDF לחנות בודדת"""
+    """יצירת PDF מעוצב לחנות בודדת"""
     pdf = FPDF()
     pdf.add_page()
     
@@ -144,65 +144,150 @@ def create_store_pdf(store_info, store_products, missing_products):
         pdf.add_font('Hebrew', '', '/usr/share/fonts/truetype/freefont/FreeSerif.ttf')
         pdf.add_font('Hebrew', 'B', '/usr/share/fonts/truetype/freefont/FreeSerifBold.ttf')
     
-    # כותרת
-    pdf.set_font('Hebrew', 'B', 24)
-    pdf.cell(0, 15, reverse_hebrew("דוח חנות"), new_x='LMARGIN', new_y='NEXT', align='C')
+    # === כותרת ראשית ===
+    pdf.set_fill_color(102, 126, 234)  # סגול-כחול
+    pdf.rect(0, 0, 210, 35, 'F')
+    pdf.set_font('Hebrew', 'B', 28)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_y(8)
+    pdf.cell(0, 12, reverse_hebrew("דוח חנות"), align='C')
+    pdf.ln(12)
+    pdf.set_font('Hebrew', 'B', 18)
+    pdf.cell(0, 10, reverse_hebrew(str(store_info['שם חנות'])), align='C')
     
-    # פרטי חנות
-    pdf.set_font('Hebrew', 'B', 16)
-    pdf.cell(0, 10, reverse_hebrew(f"שם: {store_info['שם חנות']}"), new_x='LMARGIN', new_y='NEXT', align='R')
+    # איפוס צבע טקסט
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_y(45)
+    
+    # === תיבת פרטי חנות ===
+    pdf.set_fill_color(248, 249, 250)
+    pdf.rect(10, 45, 190, 25, 'F')
+    pdf.set_draw_color(200, 200, 200)
+    pdf.rect(10, 45, 190, 25, 'D')
     
     pdf.set_font('Hebrew', '', 12)
-    pdf.cell(0, 8, reverse_hebrew(f"מזהה: {store_info['מזהה']} | עיר: {store_info['עיר'] if pd.notna(store_info['עיר']) else '-'}"), new_x='LMARGIN', new_y='NEXT', align='R')
-    pdf.cell(0, 8, reverse_hebrew(f"דירוג: #{int(store_info['דירוג'])} | סטטוס: {store_info['סטטוס']}"), new_x='LMARGIN', new_y='NEXT', align='R')
+    pdf.set_y(50)
+    details = f"עיר: {store_info['עיר'] if pd.notna(store_info['עיר']) else '-'}  |  מזהה: {store_info['מזהה']}  |  דירוג: #{int(store_info['דירוג'])}  |  סטטוס: {store_info['סטטוס']}"
+    pdf.cell(0, 8, reverse_hebrew(details), align='C')
     
-    pdf.ln(5)
-    pdf.set_draw_color(200, 200, 200)
-    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
-    pdf.ln(5)
+    pdf.set_y(75)
     
-    # מדדים
+    # === מדדי מכירות ===
     pdf.set_font('Hebrew', 'B', 14)
-    pdf.cell(0, 10, reverse_hebrew("מדדי מכירות"), new_x='LMARGIN', new_y='NEXT', align='R')
+    pdf.set_fill_color(102, 126, 234)
+    pdf.set_text_color(255, 255, 255)
+    pdf.cell(0, 10, reverse_hebrew("  מדדי מכירות  "), align='R', fill=True)
+    pdf.ln(12)
+    pdf.set_text_color(0, 0, 0)
     
-    pdf.set_font('Hebrew', '', 11)
-    metrics = [
-        f"שנה קודמת: {store_info['שנה1']:,.0f} | שנה נוכחית: {store_info['שנה2']:,.0f} | שינוי: {store_info['שינוי_שנתי']:+.1%}",
-        f"H1: {store_info['6v6_H1']:,.0f} | H2: {store_info['6v6_H2']:,.0f} | שינוי: {store_info['שינוי_6v6']:+.1%}",
-        f"Q2: {store_info['3v3_Q2']:,.0f} | Q3: {store_info['3v3_Q3']:,.0f} | שינוי: {store_info['שינוי_רבעוני']:+.1%}",
-        f"2v2 קודם: {store_info['2v2_קודם']:,.0f} | 2v2 אחרון: {store_info['2v2_אחרון']:,.0f} | שינוי: {store_info['שינוי_2v2']:+.1%}",
+    # טבלת מדדים
+    pdf.set_font('Hebrew', 'B', 10)
+    pdf.set_fill_color(230, 230, 230)
+    col_w = 47.5
+    pdf.cell(col_w, 8, reverse_hebrew("שינוי"), border=1, align='C', fill=True)
+    pdf.cell(col_w, 8, reverse_hebrew("נוכחי"), border=1, align='C', fill=True)
+    pdf.cell(col_w, 8, reverse_hebrew("קודם"), border=1, align='C', fill=True)
+    pdf.cell(col_w, 8, reverse_hebrew("תקופה"), border=1, align='C', fill=True)
+    pdf.ln()
+    
+    pdf.set_font('Hebrew', '', 10)
+    metrics_data = [
+        ("שנתי", store_info['שנה1'], store_info['שנה2'], store_info['שינוי_שנתי']),
+        ("H1 vs H2", store_info['6v6_H1'], store_info['6v6_H2'], store_info['שינוי_6v6']),
+        ("Q2 vs Q3", store_info['3v3_Q2'], store_info['3v3_Q3'], store_info['שינוי_רבעוני']),
+        ("8-9 vs 10-11", store_info['2v2_קודם'], store_info['2v2_אחרון'], store_info['שינוי_2v2']),
     ]
-    for m in metrics:
-        pdf.cell(0, 7, reverse_hebrew(m), new_x='LMARGIN', new_y='NEXT', align='R')
     
-    pdf.ln(5)
-    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
-    pdf.ln(5)
+    for period, prev_val, curr_val, change in metrics_data:
+        # צבע לפי שינוי
+        if change > 0:
+            pdf.set_fill_color(212, 237, 218)  # ירוק בהיר
+        elif change < -0.1:
+            pdf.set_fill_color(248, 215, 218)  # אדום בהיר
+        else:
+            pdf.set_fill_color(255, 255, 255)
+        
+        pdf.cell(col_w, 7, f"{change:+.1%}", border=1, align='C', fill=True)
+        pdf.set_fill_color(255, 255, 255)
+        pdf.cell(col_w, 7, f"{curr_val:,.0f}", border=1, align='C')
+        pdf.cell(col_w, 7, f"{prev_val:,.0f}", border=1, align='C')
+        pdf.cell(col_w, 7, reverse_hebrew(period), border=1, align='C')
+        pdf.ln()
     
-    # מוצרים בחנות - Top 10
+    pdf.ln(8)
+    
+    # === טבלת מוצרים בחנות ===
     if len(store_products) > 0:
         pdf.set_font('Hebrew', 'B', 14)
-        pdf.cell(0, 10, reverse_hebrew("Top 10 מוצרים בחנות"), new_x='LMARGIN', new_y='NEXT', align='R')
+        pdf.set_fill_color(40, 167, 69)  # ירוק
+        pdf.set_text_color(255, 255, 255)
+        pdf.cell(0, 10, reverse_hebrew(f"  מוצרים בחנות ({len(store_products)})  "), align='R', fill=True)
+        pdf.ln(12)
+        pdf.set_text_color(0, 0, 0)
         
-        pdf.set_font('Hebrew', '', 10)
-        top10 = store_products.nlargest(10, 'שנה2')
-        for _, row in top10.iterrows():
-            line = f"{row['מוצר']}: {row['שנה2']:,.0f}"
-            pdf.cell(0, 6, reverse_hebrew(line), new_x='LMARGIN', new_y='NEXT', align='R')
+        # כותרות טבלה
+        pdf.set_font('Hebrew', 'B', 9)
+        pdf.set_fill_color(230, 230, 230)
+        pdf.cell(25, 7, reverse_hebrew("שינוי"), border=1, align='C', fill=True)
+        pdf.cell(30, 7, reverse_hebrew("נוכחי"), border=1, align='C', fill=True)
+        pdf.cell(30, 7, reverse_hebrew("קודם"), border=1, align='C', fill=True)
+        pdf.cell(35, 7, reverse_hebrew("סיווג"), border=1, align='C', fill=True)
+        pdf.cell(70, 7, reverse_hebrew("מוצר"), border=1, align='C', fill=True)
+        pdf.ln()
+        
+        pdf.set_font('Hebrew', '', 8)
+        top_products = store_products.nlargest(15, 'שנה2')
+        for _, row in top_products.iterrows():
+            change = (row['שנה2'] - row['שנה1']) / row['שנה1'] if row['שנה1'] > 0 else 0
+            
+            if change > 0:
+                pdf.set_fill_color(212, 237, 218)
+            elif change < -0.1:
+                pdf.set_fill_color(248, 215, 218)
+            else:
+                pdf.set_fill_color(255, 255, 255)
+            
+            pdf.cell(25, 6, f"{change:+.1%}", border=1, align='C', fill=True)
+            pdf.set_fill_color(255, 255, 255)
+            pdf.cell(30, 6, f"{row['שנה2']:,.0f}", border=1, align='C')
+            pdf.cell(30, 6, f"{row['שנה1']:,.0f}", border=1, align='C')
+            pdf.cell(35, 6, reverse_hebrew(str(row['סיווג'])[:15] if pd.notna(row['סיווג']) else '-'), border=1, align='C')
+            pdf.cell(70, 6, reverse_hebrew(str(row['מוצר'])[:30]), border=1, align='R')
+            pdf.ln()
     
-    pdf.ln(5)
-    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
-    pdf.ln(5)
-    
-    # מוצרים חסרים - Top 10
+    # === עמוד חדש למוצרים חסרים ===
     if len(missing_products) > 0:
-        pdf.set_font('Hebrew', 'B', 14)
-        pdf.cell(0, 10, reverse_hebrew("Top 10 מוצרים חסרים (לפי מכירות כלליות)"), new_x='LMARGIN', new_y='NEXT', align='R')
+        pdf.add_page()
         
-        pdf.set_font('Hebrew', '', 10)
-        for _, row in missing_products.head(10).iterrows():
-            line = f"{row['מוצר']}: {row['שנה2']:,.0f} (מכירות כלליות)"
-            pdf.cell(0, 6, reverse_hebrew(line), new_x='LMARGIN', new_y='NEXT', align='R')
+        # כותרת
+        pdf.set_fill_color(220, 53, 69)  # אדום
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font('Hebrew', 'B', 14)
+        pdf.cell(0, 10, reverse_hebrew(f"  מוצרים שהחנות לא מקבלת ({len(missing_products)})  "), align='R', fill=True)
+        pdf.ln(12)
+        pdf.set_text_color(0, 0, 0)
+        
+        # כותרות טבלה
+        pdf.set_font('Hebrew', 'B', 9)
+        pdf.set_fill_color(230, 230, 230)
+        pdf.cell(40, 7, reverse_hebrew("מכירות כלליות"), border=1, align='C', fill=True)
+        pdf.cell(50, 7, reverse_hebrew("סיווג"), border=1, align='C', fill=True)
+        pdf.cell(100, 7, reverse_hebrew("מוצר"), border=1, align='C', fill=True)
+        pdf.ln()
+        
+        pdf.set_font('Hebrew', '', 8)
+        for _, row in missing_products.head(25).iterrows():
+            pdf.cell(40, 6, f"{row['שנה2']:,.0f}", border=1, align='C')
+            pdf.cell(50, 6, reverse_hebrew(str(row['סיווג'])[:20] if pd.notna(row['סיווג']) else '-'), border=1, align='C')
+            pdf.cell(100, 6, reverse_hebrew(str(row['מוצר'])[:45]), border=1, align='R')
+            pdf.ln()
+    
+    # === Footer ===
+    pdf.set_y(-20)
+    pdf.set_font('Hebrew', '', 8)
+    pdf.set_text_color(128, 128, 128)
+    from datetime import datetime
+    pdf.cell(0, 10, reverse_hebrew(f"נוצר בתאריך: {datetime.now().strftime('%d/%m/%Y %H:%M')}"), align='C')
     
     return bytes(pdf.output())
 
