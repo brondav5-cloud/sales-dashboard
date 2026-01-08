@@ -226,19 +226,23 @@ def create_store_pdf(store_info, store_products, missing_products):
         pdf.set_text_color(0, 0, 0)
         
         # כותרות טבלה
-        pdf.set_font('Hebrew', 'B', 9)
+        pdf.set_font('Hebrew', 'B', 8)
         pdf.set_fill_color(230, 230, 230)
-        pdf.cell(25, 7, reverse_hebrew("שינוי"), border=1, align='C', fill=True)
-        pdf.cell(30, 7, reverse_hebrew("נוכחי"), border=1, align='C', fill=True)
-        pdf.cell(30, 7, reverse_hebrew("קודם"), border=1, align='C', fill=True)
-        pdf.cell(35, 7, reverse_hebrew("סיווג"), border=1, align='C', fill=True)
-        pdf.cell(70, 7, reverse_hebrew("מוצר"), border=1, align='C', fill=True)
+        pdf.cell(18, 7, reverse_hebrew("שינוי"), border=1, align='C', fill=True)
+        pdf.cell(22, 7, reverse_hebrew("נוכחי"), border=1, align='C', fill=True)
+        pdf.cell(22, 7, reverse_hebrew("קודם"), border=1, align='C', fill=True)
+        pdf.cell(18, 7, reverse_hebrew("שינוי 3v3"), border=1, align='C', fill=True)
+        pdf.cell(22, 7, reverse_hebrew("Q3"), border=1, align='C', fill=True)
+        pdf.cell(22, 7, reverse_hebrew("Q2"), border=1, align='C', fill=True)
+        pdf.cell(28, 7, reverse_hebrew("סיווג"), border=1, align='C', fill=True)
+        pdf.cell(38, 7, reverse_hebrew("מוצר"), border=1, align='C', fill=True)
         pdf.ln()
         
-        pdf.set_font('Hebrew', '', 8)
+        pdf.set_font('Hebrew', '', 7)
         top_products = store_products.nlargest(15, 'שנה2')
         for _, row in top_products.iterrows():
             change = (row['שנה2'] - row['שנה1']) / row['שנה1'] if row['שנה1'] > 0 else 0
+            change_3v3 = (row['3v3_Q3'] - row['3v3_Q2']) / row['3v3_Q2'] if row['3v3_Q2'] > 0 else 0
             
             if change > 0:
                 pdf.set_fill_color(212, 237, 218)
@@ -247,12 +251,25 @@ def create_store_pdf(store_info, store_products, missing_products):
             else:
                 pdf.set_fill_color(255, 255, 255)
             
-            pdf.cell(25, 6, f"{change:+.1%}", border=1, align='C', fill=True)
+            pdf.cell(18, 6, f"{change:+.1%}", border=1, align='C', fill=True)
             pdf.set_fill_color(255, 255, 255)
-            pdf.cell(30, 6, f"{row['שנה2']:,.0f}", border=1, align='C')
-            pdf.cell(30, 6, f"{row['שנה1']:,.0f}", border=1, align='C')
-            pdf.cell(35, 6, reverse_hebrew(str(row['סיווג'])[:15] if pd.notna(row['סיווג']) else '-'), border=1, align='C')
-            pdf.cell(70, 6, reverse_hebrew(str(row['מוצר'])[:30]), border=1, align='R')
+            pdf.cell(22, 6, f"{row['שנה2']:,.0f}", border=1, align='C')
+            pdf.cell(22, 6, f"{row['שנה1']:,.0f}", border=1, align='C')
+            
+            # צבע לשינוי 3v3
+            if change_3v3 > 0:
+                pdf.set_fill_color(212, 237, 218)
+            elif change_3v3 < -0.1:
+                pdf.set_fill_color(248, 215, 218)
+            else:
+                pdf.set_fill_color(255, 255, 255)
+            pdf.cell(18, 6, f"{change_3v3:+.1%}", border=1, align='C', fill=True)
+            
+            pdf.set_fill_color(255, 255, 255)
+            pdf.cell(22, 6, f"{row['3v3_Q3']:,.0f}", border=1, align='C')
+            pdf.cell(22, 6, f"{row['3v3_Q2']:,.0f}", border=1, align='C')
+            pdf.cell(28, 6, reverse_hebrew(str(row['סיווג'])[:12] if pd.notna(row['סיווג']) else '-'), border=1, align='C')
+            pdf.cell(38, 6, reverse_hebrew(str(row['מוצר'])[:18]), border=1, align='R')
             pdf.ln()
     
     # === עמוד חדש למוצרים חסרים ===
@@ -337,7 +354,19 @@ stores['שינוי_3v3'] = stores.apply(lambda r: chg(r['3v3_שנה2'], r['3v3_�
 stores['שינוי_רבעוני'] = stores.apply(lambda r: chg(r['3v3_Q3'], r['3v3_Q2']), axis=1)
 stores['שינוי_2v2'] = stores.apply(lambda r: chg(r['2v2_אחרון'], r['2v2_קודם']), axis=1)
 stores['סטטוס'] = stores.apply(lambda r: calc_status(r, th), axis=1)
-stores['דירוג'] = stores['שנה2'].rank(ascending=False, method='min').astype(int)
+
+# 3 דירוגים לחנויות
+stores['דירוג_מכירות'] = stores['שנה2'].rank(ascending=False, method='min').astype(int)
+stores['דירוג_צמיחה'] = stores['שינוי_שנתי'].rank(ascending=False, method='min').astype(int)
+stores['דירוג_טווח_קצר'] = stores['שינוי_רבעוני'].rank(ascending=False, method='min').astype(int)
+stores['דירוג'] = stores['דירוג_מכירות']  # ברירת מחדל
+
+# חישובי מוצרים
+products['שינוי_שנתי'] = products.apply(lambda r: chg(r['שנה2'], r['שנה1']), axis=1)
+products['שינוי_6v6'] = products.apply(lambda r: chg(r['6v6_H2'], r['6v6_H1']), axis=1)
+products['שינוי_רבעוני'] = products.apply(lambda r: chg(r['3v3_Q3'], r['3v3_Q2']), axis=1)
+products['סטטוס'] = products.apply(lambda r: calc_status(r, th), axis=1)
+products['דירוג'] = products['שנה2'].rank(ascending=False, method='min').astype(int)
 
 # סינון לפי סוכן
 all_active = stores[stores['2v2_אחרון'] > 0].copy()
@@ -361,6 +390,16 @@ if excluded_stores:
     active = active[~active['מזהה'].isin(excluded_ids)].copy()
     sp_filtered = sp_filtered[~sp_filtered['מזהה_חנות'].isin(excluded_ids)].copy()
     st.sidebar.warning(f"הוחרגו {len(excluded_ids)} חנויות")
+
+# החרגת מוצרים
+st.sidebar.subheader("🚫 החרגת מוצרים")
+exclude_prod_options = products.apply(lambda r: f"{r['מזהה']} - {r['מוצר']}", axis=1).tolist()
+excluded_products = st.sidebar.multiselect("בחר מוצרים להחרגה:", sorted(exclude_prod_options), key="exclude_products")
+if excluded_products:
+    excluded_prod_ids = [int(x.split(' - ')[0]) for x in excluded_products]
+    products = products[~products['מזהה'].isin(excluded_prod_ids)].copy()
+    sp_filtered = sp_filtered[~sp_filtered['מזהה_מוצר'].isin(excluded_prod_ids)].copy()
+    st.sidebar.warning(f"הוחרגו {len(excluded_prod_ids)} מוצרים")
 
 # סינונים נוספים
 st.sidebar.subheader("🔍 סינונים")
@@ -419,29 +458,58 @@ with tabs[1]:
     if st.session_state.user_type == "agent":
         st.info(f"📋 מציג {len(filtered)} חנויות המשויכות ל-{st.session_state.user_name}")
     
-    d = filtered[['מזהה', 'שם חנות', 'עיר', 'שנה1', 'שנה2', 'שינוי_שנתי', '6v6_H1', '6v6_H2', 'שינוי_6v6', '3v3_Q2', '3v3_Q3', 'שינוי_רבעוני', '2v2_קודם', '2v2_אחרון', 'שינוי_2v2', 'סטטוס', 'דירוג']].copy()
-    for c in ['שנה1', 'שנה2', '6v6_H1', '6v6_H2', '3v3_Q2', '3v3_Q3', '2v2_קודם', '2v2_אחרון']:
+    d = filtered[['מזהה', 'שם חנות', 'עיר', 'שנה1', 'שנה2', 'שינוי_שנתי', '6v6_H1', '6v6_H2', 'שינוי_6v6', '3v3_Q2', '3v3_Q3', 'שינוי_רבעוני', '2v2_קודם', '2v2_אחרון', 'שינוי_2v2', 'סטטוס', 'דירוג_מכירות', 'דירוג_צמיחה', 'דירוג_טווח_קצר']].copy()
+    d.columns = ['מזהה', 'שם חנות', 'עיר', 'שנה קודמת', 'שנה נוכחית', 'שינוי שנתי', 'H1', 'H2', 'שינוי H1/H2', 'Q2', 'Q3', 'שינוי Q2/Q3', '2v2 קודם', '2v2 אחרון', 'שינוי 2v2', 'סטטוס', 'דירוג מכירות', 'דירוג צמיחה', 'דירוג טווח קצר']
+    for c in ['שנה קודמת', 'שנה נוכחית', 'H1', 'H2', 'Q2', 'Q3', '2v2 קודם', '2v2 אחרון']:
         d[c] = d[c].apply(fmt_num)
-    for c in ['שינוי_שנתי', 'שינוי_6v6', 'שינוי_רבעוני', 'שינוי_2v2']:
+    for c in ['שינוי שנתי', 'שינוי H1/H2', 'שינוי Q2/Q3', 'שינוי 2v2']:
         d[c] = d[c].apply(fmt_pct)
     st.dataframe(d, hide_index=True, use_container_width=True, height=600)
     st.download_button("📥 הורד", to_excel(filtered, 'חנויות'), "חנויות.xlsx")
 
 with tabs[2]:
     st.title("📦 מוצרים")
-    products['שינוי'] = products.apply(lambda r: chg(r['שנה2'], r['שנה1']), axis=1)
+    
+    # סיכום מדדים
+    c1, c2, c3, c4, c5 = st.columns(5)
+    total_prod = products['שנה2'].sum()
+    prev_prod = products['שנה1'].sum()
+    c1.metric("💰 מכירות מוצרים", fmt_num(total_prod), fmt_pct(chg(total_prod, prev_prod)))
+    c2.metric("📦 סה״כ מוצרים", len(products))
+    c3.metric("📈 צמיחה", len(products[products['סטטוס'] == 'צמיחה']))
+    c4.metric("⚠️ סיכון", len(products[products['סטטוס'].isin(['סכנה', 'שחיקה'])]))
+    c5.metric("🆕 חדשים", len(products[products['סטטוס'] == 'חדש/ה']))
+    
+    st.markdown("---")
+    
+    # גרפים
     c1, c2 = st.columns(2)
     with c1:
-        st.subheader("🏆 Top 10")
-        tp = products.nlargest(10, 'שנה2')[['מוצר', 'סיווג', 'שנה2', 'שינוי']].copy()
-        tp['שנה2'] = tp['שנה2'].apply(fmt_num)
-        tp['שינוי'] = tp['שינוי'].apply(fmt_pct)
-        st.dataframe(tp, hide_index=True, use_container_width=True)
+        st.subheader("📊 סטטוס מוצרים")
+        if len(products) > 0:
+            sc = products['סטטוס'].value_counts()
+            colors = {'צמיחה': '#28a745', 'יציב': '#17a2b8', 'שחיקה': '#ffc107', 'התאוששות': '#9c27b0', 'סכנה': '#dc3545', 'חדש/ה': '#ff9800'}
+            fig = px.pie(values=sc.values, names=sc.index, color=sc.index, color_discrete_map=colors, hole=0.4)
+            fig.update_traces(textposition='inside', textinfo='percent+label')
+            st.plotly_chart(fig, use_container_width=True)
     with c2:
         st.subheader("📊 לפי סיווג")
         cs = products.groupby('סיווג')['שנה2'].sum().reset_index()
         fig = px.pie(cs, values='שנה2', names='סיווג', hole=0.3)
         st.plotly_chart(fig, use_container_width=True)
+    
+    st.markdown("---")
+    st.subheader("📋 טבלת מוצרים מלאה")
+    
+    # טבלת מוצרים מלאה
+    d_prod = products[['מזהה', 'מוצר', 'סיווג', 'שנה1', 'שנה2', 'שינוי_שנתי', '6v6_H1', '6v6_H2', 'שינוי_6v6', '3v3_Q2', '3v3_Q3', 'שינוי_רבעוני', 'סטטוס', 'דירוג']].copy()
+    d_prod.columns = ['מזהה', 'מוצר', 'סיווג', 'שנה קודמת', 'שנה נוכחית', 'שינוי שנתי', 'H1', 'H2', 'שינוי H1/H2', 'Q2', 'Q3', 'שינוי Q2/Q3', 'סטטוס', 'דירוג']
+    for c in ['שנה קודמת', 'שנה נוכחית', 'H1', 'H2', 'Q2', 'Q3']:
+        d_prod[c] = d_prod[c].apply(fmt_num)
+    for c in ['שינוי שנתי', 'שינוי H1/H2', 'שינוי Q2/Q3']:
+        d_prod[c] = d_prod[c].apply(fmt_pct)
+    st.dataframe(d_prod, hide_index=True, use_container_width=True, height=500)
+    st.download_button("📥 הורד מוצרים", to_excel(products, 'מוצרים'), "מוצרים.xlsx")
 
 with tabs[3]:
     st.title("🔍 בחירת חנות")
@@ -451,15 +519,24 @@ with tabs[3]:
         sid = int(sel.split(' - ')[0])
         info = filtered[filtered['מזהה'] == sid].iloc[0]
         
+        # שורה ראשונה - פרטים בסיסיים
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("מזהה", info['מזהה'])
         c1.metric("עיר", info['עיר'] if pd.notna(info['עיר']) else '-')
-        c2.metric("דירוג", f"#{int(info['דירוג'])}")
         c2.metric("סטטוס", info['סטטוס'])
-        c3.metric("שנה1", fmt_num(info['שנה1']))
-        c3.metric("שנה2", fmt_num(info['שנה2']))
-        c4.metric("שינוי שנתי", fmt_pct(info['שינוי_שנתי']))
+        c2.metric("שינוי שנתי", fmt_pct(info['שינוי_שנתי']))
+        c3.metric("שנה קודמת", fmt_num(info['שנה1']))
+        c3.metric("שנה נוכחית", fmt_num(info['שנה2']))
+        c4.metric("שינוי Q2/Q3", fmt_pct(info['שינוי_רבעוני']))
         c4.metric("שינוי 2v2", fmt_pct(info['שינוי_2v2']))
+        
+        # שורה שנייה - 3 דירוגים
+        st.markdown("---")
+        st.subheader("🏆 דירוגים")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("🥇 דירוג מכירות שנתי", f"#{int(info['דירוג_מכירות'])}", help="החנות עם המכירות הגבוהות ביותר = #1")
+        c2.metric("📈 דירוג צמיחה שנתית", f"#{int(info['דירוג_צמיחה'])}", help="החנות עם הצמיחה הגדולה ביותר שנה מול שנה = #1")
+        c3.metric("⚡ דירוג טווח קצר", f"#{int(info['דירוג_טווח_קצר'])}", help="החנות עם הצמיחה הגדולה ביותר Q3 מול Q2 = #1")
         
         st.markdown("---")
         st.subheader("📊 כל המדדים")
@@ -480,6 +557,13 @@ with tabs[3]:
         c4.metric("8-9/2025", fmt_num(info['2v2_קודם']))
         c4.metric("10-11/2025", fmt_num(info['2v2_אחרון']))
         c4.metric("שינוי", fmt_pct(info['שינוי_2v2']))
+        
+        # אחוז חזרות
+        st.markdown("---")
+        st.subheader("🔄 אחוז החזרות")
+        c1, c2 = st.columns(2)
+        c1.metric("אחוז החזרות H1", f"{info['H1_שנה2_אחוז_חזרות']:.1f}%")
+        c2.metric("אחוז החזרות H2", f"{info['H2_שנה2_אחוז_חזרות']:.1f}%")
         
         st.markdown("---")
         st.subheader("📦 מוצרים בחנות")
@@ -549,13 +633,41 @@ with tabs[4]:
         pid = int(sel.split(' - ')[0])
         pinfo = products[products['מזהה'] == pid].iloc[0]
         
+        # שורה ראשונה - פרטים בסיסיים
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("מוצר", pinfo['מוצר'])
-        c2.metric("סיווג", pinfo['סיווג'] if pd.notna(pinfo['סיווג']) else '-')
-        c3.metric("מכירות", fmt_num(pinfo['שנה2']))
-        c4.metric("שינוי", fmt_pct(chg(pinfo['שנה2'], pinfo['שנה1'])))
+        c1.metric("סיווג", pinfo['סיווג'] if pd.notna(pinfo['סיווג']) else '-')
+        c2.metric("סטטוס", pinfo['סטטוס'])
+        c2.metric("דירוג", f"#{int(pinfo['דירוג'])}")
+        c3.metric("שנה קודמת", fmt_num(pinfo['שנה1']))
+        c3.metric("שנה נוכחית", fmt_num(pinfo['שנה2']))
+        c4.metric("שינוי שנתי", fmt_pct(pinfo['שינוי_שנתי']))
+        c4.metric("שינוי Q2/Q3", fmt_pct(pinfo['שינוי_רבעוני']))
+        
+        # שורה שנייה - מדדים נוספים
+        st.markdown("---")
+        st.subheader("📊 כל המדדים")
+        c1, c2, c3, c4 = st.columns(4)
+        c1.markdown("**שנתי**")
+        c1.metric("שנה קודמת", fmt_num(pinfo['שנה1']))
+        c1.metric("שנה נוכחית", fmt_num(pinfo['שנה2']))
+        c1.metric("שינוי", fmt_pct(pinfo['שינוי_שנתי']))
+        c2.markdown("**H1 vs H2**")
+        c2.metric("H1", fmt_num(pinfo['6v6_H1']))
+        c2.metric("H2", fmt_num(pinfo['6v6_H2']))
+        c2.metric("שינוי", fmt_pct(pinfo['שינוי_6v6']))
+        c3.markdown("**Q2 vs Q3**")
+        c3.metric("Q2", fmt_num(pinfo['3v3_Q2']))
+        c3.metric("Q3", fmt_num(pinfo['3v3_Q3']))
+        c3.metric("שינוי", fmt_pct(pinfo['שינוי_רבעוני']))
+        c4.markdown("**אחוז החזרות**")
+        c4.metric("H1", f"{pinfo['H1_שנה2_אחוז_חזרות']:.1f}%")
+        c4.metric("H2", f"{pinfo['H2_שנה2_אחוז_חזרות']:.1f}%")
+        avg_returns = (pinfo['H1_שנה2_אחוז_חזרות'] + pinfo['H2_שנה2_אחוז_חזרות']) / 2
+        c4.metric("ממוצע שנתי", f"{avg_returns:.1f}%")
         
         st.markdown("---")
+        st.subheader("🏪 חנויות שמוכרות את המוצר")
         ps = sp_filtered[sp_filtered['מזהה_מוצר'] == pid].copy()
         ps = ps[ps['מזהה_חנות'].isin(active['מזהה'])]
         if len(ps) > 0:
@@ -564,15 +676,23 @@ with tabs[4]:
             c1, c2, c3 = st.columns(3)
             c1.metric("חנויות מוכרות", selling)
             c2.metric("חדירה", f"{pen:.1f}%")
-            c3.metric("סה״כ חנויות", len(active))
+            c3.metric("סה״כ חנויות פעילות", len(active))
             
-            ps['שינוי'] = ps.apply(lambda r: chg(r['שנה2'], r['שנה1']), axis=1)
+            ps['שינוי_שנתי'] = ps.apply(lambda r: chg(r['שנה2'], r['שנה1']), axis=1)
+            ps['שינוי_רבעוני'] = ps.apply(lambda r: chg(r['3v3_Q3'], r['3v3_Q2']), axis=1)
             ps = ps.sort_values('שנה2', ascending=False)
-            d = ps[['שם_חנות', 'עיר', 'שנה1', 'שנה2', 'שינוי']].copy()
-            d['שנה1'] = d['שנה1'].apply(fmt_num)
-            d['שנה2'] = d['שנה2'].apply(fmt_num)
-            d['שינוי'] = d['שינוי'].apply(fmt_pct)
+            
+            # טבלה מלאה
+            d = ps[['שם_חנות', 'עיר', 'שנה1', 'שנה2', 'שינוי_שנתי', '3v3_Q2', '3v3_Q3', 'שינוי_רבעוני', '2v2_קודם', '2v2_אחרון']].copy()
+            d.columns = ['חנות', 'עיר', 'שנה קודמת', 'שנה נוכחית', 'שינוי שנתי', 'Q2', 'Q3', 'שינוי Q2/Q3', '2v2 קודם', '2v2 אחרון']
+            for c in ['שנה קודמת', 'שנה נוכחית', 'Q2', 'Q3', '2v2 קודם', '2v2 אחרון']:
+                d[c] = d[c].apply(fmt_num)
+            for c in ['שינוי שנתי', 'שינוי Q2/Q3']:
+                d[c] = d[c].apply(fmt_pct)
             st.dataframe(d, hide_index=True, use_container_width=True, height=400)
+            st.download_button("📥 הורד נתוני מוצר", to_excel(ps, 'מוצר_חנויות'), f"מוצר_{pid}_חנויות.xlsx")
+        else:
+            st.warning("לא נמצאו חנויות שמוכרות את המוצר")
 
 with tabs[5]:
     st.title("🚫 חנויות סגורות")
