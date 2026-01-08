@@ -204,7 +204,7 @@ def create_store_pdf(store_info, store_products, missing_products):
             line = f"{row['מוצר']}: {row['שנה2']:,.0f} (מכירות כלליות)"
             pdf.cell(0, 6, reverse_hebrew(line), new_x='LMARGIN', new_y='NEXT', align='R')
     
-    return pdf.output()
+    return bytes(pdf.output())
 
 if not check_login():
     st.stop()
@@ -321,11 +321,13 @@ with tabs[0]:
     with c2:
         st.subheader("🏙️ ערים")
         if len(filtered) > 0:
-            cs = filtered.groupby('עיר')['שנה2'].sum().nlargest(10).reset_index()
-            fig = px.bar(cs, x='שנה2', y='עיר', orientation='h', text=cs['שנה2'].apply(fmt_num))
-            fig.update_layout(yaxis={'categoryorder': 'total ascending'})
-            fig.update_traces(textposition='outside')
-            st.plotly_chart(fig, use_container_width=True)
+            filtered_with_city = filtered[filtered['עיר'].notna() & (filtered['עיר'] != '')]
+            if len(filtered_with_city) > 0:
+                cs = filtered_with_city.groupby('עיר')['שנה2'].sum().nlargest(10).reset_index()
+                fig = px.bar(cs, x='שנה2', y='עיר', orientation='h', text=cs['שנה2'].apply(fmt_num))
+                fig.update_layout(yaxis={'categoryorder': 'total ascending'})
+                fig.update_traces(textposition='outside')
+                st.plotly_chart(fig, use_container_width=True)
 
 with tabs[1]:
     st.title("🏪 החנויות שלי")
