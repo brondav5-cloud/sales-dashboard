@@ -5,6 +5,8 @@ import plotly.graph_objects as go
 import json
 import io
 from pathlib import Path
+from fpdf import FPDF
+import base64
 
 st.set_page_config(page_title="דשבורד מכירות", page_icon="📊", layout="wide")
 
@@ -122,6 +124,88 @@ def to_excel(df, sheet):
         df.to_excel(w, sheet_name=sheet, index=False)
     return out.getvalue()
 
+def reverse_hebrew(text):
+    """הפיכת טקסט עברי לתצוגה ב-PDF"""
+    if pd.isna(text):
+        return '-'
+    return str(text)[::-1]
+
+def create_store_pdf(store_info, store_products, missing_products):
+    """יצירת PDF לחנות בודדת"""
+    pdf = FPDF()
+    pdf.add_page()
+    
+    # הוספת פונט עברי
+    font_path = Path(__file__).parent / 'FreeSerif.ttf'
+    if font_path.exists():
+        pdf.add_font('Hebrew', '', str(font_path))
+        pdf.add_font('Hebrew', 'B', str(font_path.parent / 'FreeSerifBold.ttf'))
+    else:
+        pdf.add_font('Hebrew', '', '/usr/share/fonts/truetype/freefont/FreeSerif.ttf')
+        pdf.add_font('Hebrew', 'B', '/usr/share/fonts/truetype/freefont/FreeSerifBold.ttf')
+    
+    # כותרת
+    pdf.set_font('Hebrew', 'B', 24)
+    pdf.cell(0, 15, reverse_hebrew("דוח חנות"), new_x='LMARGIN', new_y='NEXT', align='C')
+    
+    # פרטי חנות
+    pdf.set_font('Hebrew', 'B', 16)
+    pdf.cell(0, 10, reverse_hebrew(f"שם: {store_info['שם חנות']}"), new_x='LMARGIN', new_y='NEXT', align='R')
+    
+    pdf.set_font('Hebrew', '', 12)
+    pdf.cell(0, 8, reverse_hebrew(f"מזהה: {store_info['מזהה']} | עיר: {store_info['עיר'] if pd.notna(store_info['עיר']) else '-'}"), new_x='LMARGIN', new_y='NEXT', align='R')
+    pdf.cell(0, 8, reverse_hebrew(f"דירוג: #{int(store_info['דירוג'])} | סטטוס: {store_info['סטטוס']}"), new_x='LMARGIN', new_y='NEXT', align='R')
+    
+    pdf.ln(5)
+    pdf.set_draw_color(200, 200, 200)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(5)
+    
+    # מדדים
+    pdf.set_font('Hebrew', 'B', 14)
+    pdf.cell(0, 10, reverse_hebrew("מדדי מכירות"), new_x='LMARGIN', new_y='NEXT', align='R')
+    
+    pdf.set_font('Hebrew', '', 11)
+    metrics = [
+        f"שנה קודמת: {store_info['שנה1']:,.0f} | שנה נוכחית: {store_info['שנה2']:,.0f} | שינוי: {store_info['שינוי_שנתי']:+.1%}",
+        f"H1: {store_info['6v6_H1']:,.0f} | H2: {store_info['6v6_H2']:,.0f} | שינוי: {store_info['שינוי_6v6']:+.1%}",
+        f"Q2: {store_info['3v3_Q2']:,.0f} | Q3: {store_info['3v3_Q3']:,.0f} | שינוי: {store_info['שינוי_רבעוני']:+.1%}",
+        f"2v2 קודם: {store_info['2v2_קודם']:,.0f} | 2v2 אחרון: {store_info['2v2_אחרון']:,.0f} | שינוי: {store_info['שינוי_2v2']:+.1%}",
+    ]
+    for m in metrics:
+        pdf.cell(0, 7, reverse_hebrew(m), new_x='LMARGIN', new_y='NEXT', align='R')
+    
+    pdf.ln(5)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(5)
+    
+    # מוצרים בחנות - Top 10
+    if len(store_products) > 0:
+        pdf.set_font('Hebrew', 'B', 14)
+        pdf.cell(0, 10, reverse_hebrew("Top 10 מוצרים בחנות"), new_x='LMARGIN', new_y='NEXT', align='R')
+        
+        pdf.set_font('Hebrew', '', 10)
+        top10 = store_products.nlargest(10, 'שנה2')
+        for _, row in top10.iterrows():
+            line = f"{row['מוצר']}: {row['שנה2']:,.0f}"
+            pdf.cell(0, 6, reverse_hebrew(line), new_x='LMARGIN', new_y='NEXT', align='R')
+    
+    pdf.ln(5)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(5)
+    
+    # מוצרים חסרים - Top 10
+    if len(missing_products) > 0:
+        pdf.set_font('Hebrew', 'B', 14)
+        pdf.cell(0, 10, reverse_hebrew("Top 10 מוצרים חסרים (לפי מכירות כלליות)"), new_x='LMARGIN', new_y='NEXT', align='R')
+        
+        pdf.set_font('Hebrew', '', 10)
+        for _, row in missing_products.head(10).iterrows():
+            line = f"{row['מוצר']}: {row['שנה2']:,.0f} (מכירות כלליות)"
+            pdf.cell(0, 6, reverse_hebrew(line), new_x='LMARGIN', new_y='NEXT', align='R')
+    
+    return pdf.output()
+
 if not check_login():
     st.stop()
 
@@ -182,6 +266,16 @@ else:
     active = all_active.copy()
     closed = all_closed.copy()
     sp_filtered = sp.copy()
+
+# החרגת חנויות
+st.sidebar.subheader("🚫 החרגת חנויות")
+exclude_options = active.apply(lambda r: f"{r['מזהה']} - {r['שם חנות']}", axis=1).tolist()
+excluded_stores = st.sidebar.multiselect("בחר חנויות להחרגה:", sorted(exclude_options), key="exclude_stores")
+if excluded_stores:
+    excluded_ids = [int(x.split(' - ')[0]) for x in excluded_stores]
+    active = active[~active['מזהה'].isin(excluded_ids)].copy()
+    sp_filtered = sp_filtered[~sp_filtered['מזהה_חנות'].isin(excluded_ids)].copy()
+    st.sidebar.warning(f"הוחרגו {len(excluded_ids)} חנויות")
 
 # סינונים נוספים
 st.sidebar.subheader("🔍 סינונים")
@@ -283,11 +377,11 @@ with tabs[3]:
         st.markdown("---")
         st.subheader("📊 כל המדדים")
         c1, c2, c3, c4 = st.columns(4)
-        c1.markdown("**6v6**")
+        c1.markdown("**H1 (דצמבר-מאי)**")
         c1.metric("H1", fmt_num(info['6v6_H1']))
         c1.metric("H2", fmt_num(info['6v6_H2']))
         c1.metric("שינוי", fmt_pct(info['שינוי_6v6']))
-        c2.markdown("**3v3**")
+        c2.markdown("**H2 (יוני-נובמבר)**")
         c2.metric("שנה1", fmt_num(info['3v3_שנה1']))
         c2.metric("שנה2", fmt_num(info['3v3_שנה2']))
         c2.metric("שינוי", fmt_pct(info['שינוי_3v3']))
@@ -296,13 +390,20 @@ with tabs[3]:
         c3.metric("Q3", fmt_num(info['3v3_Q3']))
         c3.metric("שינוי", fmt_pct(info['שינוי_רבעוני']))
         c4.markdown("**2v2**")
-        c4.metric("קודם", fmt_num(info['2v2_קודם']))
-        c4.metric("אחרון", fmt_num(info['2v2_אחרון']))
+        c4.metric("8-9/2025", fmt_num(info['2v2_קודם']))
+        c4.metric("10-11/2025", fmt_num(info['2v2_אחרון']))
         c4.metric("שינוי", fmt_pct(info['שינוי_2v2']))
         
         st.markdown("---")
         st.subheader("📦 מוצרים בחנות")
         sp2 = sp_filtered[sp_filtered['מזהה_חנות'] == sid].copy()
+        
+        # חישוב מוצרים חסרים
+        store_product_ids = set(sp2['מזהה_מוצר'].unique())
+        all_product_ids = set(products['מזהה'].unique())
+        missing_ids = all_product_ids - store_product_ids
+        missing_products = products[products['מזהה'].isin(missing_ids)].sort_values('שנה2', ascending=False).copy()
+        
         if len(sp2) > 0:
             sp2['שינוי'] = sp2.apply(lambda r: chg(r['שנה2'], r['שנה1']), axis=1)
             sp2 = sp2.sort_values('שנה2', ascending=False)
@@ -325,6 +426,33 @@ with tabs[3]:
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.warning("לא נמצאו מוצרים")
+        
+        # מוצרים חסרים
+        st.markdown("---")
+        st.subheader("🚨 מוצרים שהחנות לא מקבלת")
+        st.info(f"נמצאו {len(missing_products)} מוצרים שהחנות לא מקבלת (ממוינים לפי מכירות כלליות)")
+        if len(missing_products) > 0:
+            md = missing_products[['מוצר', 'סיווג', 'שנה2']].copy()
+            md.columns = ['מוצר', 'סיווג', 'מכירות כלליות']
+            md['מכירות כלליות'] = md['מכירות כלליות'].apply(fmt_num)
+            st.dataframe(md, hide_index=True, use_container_width=True, height=300)
+        
+        # כפתור PDF
+        st.markdown("---")
+        st.subheader("📄 הורדת דוח PDF")
+        if st.button("📥 צור והורד PDF", key="pdf_btn"):
+            try:
+                pdf_bytes = create_store_pdf(info, sp2, missing_products)
+                st.download_button(
+                    label="💾 לחץ להורדה",
+                    data=pdf_bytes,
+                    file_name=f"דוח_חנות_{info['מזהה']}_{info['שם חנות']}.pdf",
+                    mime="application/pdf",
+                    key="pdf_download"
+                )
+                st.success("✅ הדוח נוצר בהצלחה!")
+            except Exception as e:
+                st.error(f"❌ שגיאה ביצירת PDF: {e}")
 
 with tabs[4]:
     st.title("🔎 בחירת מוצר")
